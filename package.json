@@ -1,0 +1,72 @@
+{
+	"name": "@appartmint/tsm-scripts",
+	"author": "App Art Mint LLC",
+	"version": "0.0.1",
+	"type": "module",
+	"license": "MIT",
+	"description": "TypeScript Modules from App Art Mint LLC",
+	"keywords": [
+		"typescript",
+		"modules",
+		"app art mint",
+		"appartmint",
+		"utility",
+		"scripts"
+	],
+	"homepage": "https://github.com/App-Art-Mint/tsm-scripts#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/App-Art-Mint/tsm-scripts.git"
+	},
+	"bugs": {
+		"url": "https://github.com/App-Art-Mint/tsm-scripts/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"files": [
+		"dist/**/*.{js,d.ts}"
+	],
+	"exports": {
+		"./*": {
+			"types": "./dist/*.d.ts",
+			"import": "./dist/*.es.js",
+			"require": "./dist/*.cjs.js",
+			"default": "./dist/*.es.js"
+		}
+	},
+	"scripts": {
+		"version": "npm i && git add -A",
+		"postversion": "git push && git push --tags && cross-replace gh release create \"v$npm_package_version\" --generate-notes",
+		"prepare": "run-s build",
+		"build": "run-p test:types build:prod",
+		"build:prod": "vite build",
+		"clean": "rimraf dist",
+		"test:types": "tsc -b",
+		"test:circular": "madge --circular --extensions ts .",
+		"lint": "eslint --fix .",
+		"publish:link": "yalc publish",
+		"check:updates": "npm-check-updates",
+		"format:imports": "tsx src/format/organize-imports-comments.ts",
+		"tinify:inject": "tsx src/tinify/tinyify-inject-cert.ts"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^25.4.0",
+		"cross-replace": "^0.2.0",
+		"eslint": "^10.0.3",
+		"glob": "^13.0.6",
+		"globals": "^17.4.0",
+		"jiti": "^2.6.1",
+		"madge": "^8.0.0",
+		"npm-check-updates": "^19.6.3",
+		"npm-run-all2": "^8.0.4",
+		"rimraf": "^6.1.3",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.57.0",
+		"vite": "^7.3.1",
+		"vite-plugin-dts": "^4.5.4",
+		"yalc": "^1.0.0-pre.53"
+	}
+}
