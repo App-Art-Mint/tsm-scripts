@@ -1,12 +1,16 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as ts from 'typescript';
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
 
 const rootArg = process.argv[2];
 const ROOT = rootArg ? path.resolve(rootArg) : process.cwd();
-const SRC = path.join(ROOT, 'src');
 
 type ImportGroup = 'external' | 'workspace' | 'local' | 'environment';
+
+interface TsConfigAliasEntry {
+	fileNames: Set<string>;
+	aliasPrefixes: string[];
+}
 
 interface ParsedImport {
 	spec: string;
@@ -24,17 +28,66 @@ function walkTsFiles(dir: string, out: string[] = []): string[] {
 	return out;
 }
 
-const FROM_RE = /from\s+(['"])([^'"]+)\1/;
-
 function getModuleSpecifier(text: string): string {
-	const m = FROM_RE.exec(text);
+	const m = /from\s+(['"])([^'"]+)\1/.exec(text);
 	return m ? m[2] : '';
 }
 
-function classify(spec: string): ImportGroup {
+function normalizePathForCompare(p: string): string {
+	return path.resolve(p).replace(/\\/g, '/').toLowerCase();
+}
+
+function normalizeAliasPrefix(key: string): string {
+	if (key === '*' || !key) return '';
+	if (key.endsWith('/*')) return key.slice(0, -1);
+	return key;
+}
+
+function discoverRootTsconfigs(rootDir: string): string[] {
+	return fs
+		.readdirSync(rootDir, { withFileTypes: true })
+		.filter((entry) => entry.isFile() && /^tsconfig.*\.json$/i.test(entry.name))
+		.map((entry) => path.join(rootDir, entry.name));
+}
+
+function loadTsConfigAliasEntries(rootDir: string): TsConfigAliasEntry[] {
+	const entries: TsConfigAliasEntry[] = [];
+	for (const configPath of discoverRootTsconfigs(rootDir)) {
+		const read = ts.readConfigFile(configPath, (fileName) => ts.sys.readFile(fileName));
+		if (read.error) continue;
+
+		const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configPath), undefined, configPath);
+		const paths = parsed.options.paths ?? {};
+		const aliasPrefixes = Object.keys(paths)
+			.map((key) => normalizeAliasPrefix(key))
+			.filter((key) => key.length > 0);
+		if (aliasPrefixes.length === 0) continue;
+
+		entries.push({
+			fileNames: new Set(parsed.fileNames.map((name) => normalizePathForCompare(name))),
+			aliasPrefixes
+		});
+	}
+	return entries;
+}
+
+function resolveLocalAliasPrefixes(filePath: string, tsconfigEntries: TsConfigAliasEntry[]): string[] {
+	const normalizedFilePath = normalizePathForCompare(filePath);
+	const prefixes = new Set<string>();
+	for (const entry of tsconfigEntries) {
+		if (!entry.fileNames.has(normalizedFilePath)) continue;
+		for (const prefix of entry.aliasPrefixes) {
+			prefixes.add(prefix);
+		}
+	}
+	return [...prefixes];
+}
+
+function classify(spec: string, localAliasPrefixes: string[]): ImportGroup {
 	if (!spec) return 'external';
-	if (spec.includes('/environments/') || spec.includes('environments/environment')) return 'environment';
+	if (spec.includes('/environments/') || spec.includes('environments/environment') || spec.includes('.env')) return 'environment';
 	if (spec.startsWith('@app-art-mint/') || spec.startsWith('@appartmint/')) return 'workspace';
+	if (localAliasPrefixes.some((prefix) => spec === prefix || spec.startsWith(prefix))) return 'local';
 	if (spec.startsWith('.') || spec.startsWith('..')) return 'local';
 	return 'external';
 }
@@ -101,53 +154,15 @@ function compareSpec(a: string, b: string): number {
 	return sortKey(a).localeCompare(sortKey(b), 'en');
 }
 
-function stripKnownSectionComments(text: string): string {
-	let s = text;
-	s = s.replace(/\n\s*\/\*\*\s*\n\s*\*\s*Routes\s*\n\s*\*\/\s*\n/g, '\n');
-	s = s.replace(/\n\s*\/\*\*\s*\n\s*\*\s*Module\s*\n\s*\*\/\s*\n/g, '\n');
-	return s;
-}
 
-function removeLeadingSectionJSDocOnStatements(text: string): string {
-	const sf = ts.createSourceFile('x.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	const toRemove: [number, number][] = [];
-
-	for (const stmt of sf.statements) {
-		const ranges = ts.getLeadingCommentRanges(text, stmt.getFullStart());
-		if (!ranges?.length) continue;
-		for (const r of ranges) {
-			const ctext = text.slice(r.pos, r.end);
-			if (!/^\s*\/\*\*/.test(ctext)) continue;
-			const inner = ctext
-				.replace(/^\s*\/\*\*\s*/, '')
-				.replace(/\s*\*\/\s*$/, '')
-				.replace(/^\s*\*\s?/gm, '')
-				.trim();
-			const lines = inner.split(/\n/).map((l) => l.trim()).filter(Boolean);
-			if (lines.length === 1 && /^(Routes|Module|Imports)$/.test(lines[0])) {
-				toRemove.push([r.pos, r.end]);
-			}
-		}
-	}
-
-	toRemove.sort((a, b) => b[0] - a[0]);
-	let out = text;
-	for (const [pos, end] of toRemove) {
-		out = out.slice(0, pos) + out.slice(end);
-	}
-	return out;
-}
-
-function organizeImports(sourceText: string, filePath: string): string {
+function organizeImports(sourceText: string, filePath: string, tsconfigEntries: TsConfigAliasEntry[]): string {
 	const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const localAliasPrefixes = resolveLocalAliasPrefixes(filePath, tsconfigEntries);
 
 	let i = 0;
 	const stmts = sf.statements;
 	while (i < stmts.length && ts.isImportDeclaration(stmts[i])) i++;
-
-	if (i === 0) {
-		return stripKnownSectionComments(sourceText);
-	}
+	if (i === 0) return sourceText;
 
 	const importNodes = stmts.slice(0, i);
 	const replaceStart = importNodes[0].getFullStart();
@@ -159,7 +174,7 @@ function organizeImports(sourceText: string, filePath: string): string {
 
 	const parsed: ParsedImport[] = importTexts.map((trimmed) => {
 		const spec = getModuleSpecifier(trimmed);
-		const group = classify(spec);
+		const group = classify(spec, localAliasPrefixes);
 		const wrapped = wrapImportIfNeeded(trimmed, 100, semicolon);
 		return { spec, group, finalText: wrapped, multi: isMultiLineImport(wrapped) };
 	});
@@ -177,20 +192,19 @@ function organizeImports(sourceText: string, filePath: string): string {
 	const before = sourceText.slice(0, replaceStart);
 	const after = sourceText.slice(replaceEnd);
 
-	let result = before + newBlock + after;
-	result = stripKnownSectionComments(result);
+	const result = before + newBlock + after;
 	return result;
 }
 
 let changed = 0;
-const files = walkTsFiles(SRC);
+const files = walkTsFiles(ROOT);
+const tsconfigEntries = loadTsConfigAliasEntries(ROOT);
 
 for (const filePath of files) {
 	let text = fs.readFileSync(filePath, 'utf8');
 	const original = text;
 
-	text = organizeImports(text, filePath);
-	text = removeLeadingSectionJSDocOnStatements(text);
+	text = organizeImports(text, filePath, tsconfigEntries);
 	text = text.replace(/\n{3,}(\/\*\*)/g, '\n\n$1');
 
 	if (text !== original) {
