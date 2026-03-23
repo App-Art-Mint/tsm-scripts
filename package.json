@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
@@ -31,15 +31,14 @@
 		"version": "npm i && git add -A",
 		"postversion": "git push && git push --tags && cross-replace gh release create \"v$npm_package_version\" --generate-notes",
 		"prepare": "run-s build",
-		"build": "run-p test:types build:prod",
-		"build:prod": "vite build",
+		"build": "run-p test:types",
 		"clean": "rimraf dist",
 		"test:types": "tsc -b",
 		"test:circular": "madge --circular --extensions ts .",
 		"lint": "eslint --fix .",
 		"publish:link": "yalc publish",
 		"check:updates": "npm-check-updates",
-		"format:imports": "tsx src/format/organize-imports-comments.ts",
+		"format:imports": "tsx src/format/organize-imports.ts",
 		"tinify:inject": "tsx src/tinify/tinyify-inject-cert.ts"
 	},
 	"devDependencies": {
@@ -57,8 +56,6 @@
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.57.0",
-		"vite": "^7.3.1",
-		"vite-plugin-dts": "^4.5.4",
 		"yalc": "^1.0.0-pre.53"
 	}
 }
