@@ -1,10 +1,10 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"type": "module",
 	"license": "MIT",
-	"description": "TypeScript Modules from App Art Mint LLC",
+	"description": "TypeScript Node Scripts from App Art Mint LLC",
 	"keywords": [
 		"typescript",
 		"modules",
@@ -25,16 +25,8 @@
 		"access": "public"
 	},
 	"files": [
-		"dist/**/*.{js,d.ts}"
+		"src/**/*.{ts,d.ts}"
 	],
-	"exports": {
-		"./*": {
-			"types": "./dist/*.d.ts",
-			"import": "./dist/*.es.js",
-			"require": "./dist/*.cjs.js",
-			"default": "./dist/*.es.js"
-		}
-	},
 	"scripts": {
 		"version": "npm i && git add -A",
 		"postversion": "git push && git push --tags && cross-replace gh release create \"v$npm_package_version\" --generate-notes",
