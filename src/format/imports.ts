@@ -4,7 +4,17 @@ import path from 'node:path';
 import ts from 'typescript';
 
 const rootArg = process.argv[2];
-const ROOT = rootArg ? path.resolve(rootArg) : process.cwd();
+
+/** Directory where `npm` was run (set by npm before `--prefix` moves the script cwd into a package). */
+function defaultRootFromInvocation(): string {
+	const initCwd = process.env.INIT_CWD;
+	if (initCwd) {
+		return path.resolve(initCwd);
+	}
+	return process.cwd();
+}
+
+const ROOT = rootArg ? path.resolve(rootArg) : defaultRootFromInvocation();
 
 type ImportGroup = 'external' | 'workspace' | 'local' | 'environment';
 
@@ -275,7 +285,7 @@ const tsconfigEntries = loadTsConfigAliasEntries(ROOT);
 const files = await listTsFilesUnderRoot(ROOT);
 
 let changed = 0;
-const changedRelativeToCwd: string[] = [];
+const changedRelativeToRoot: string[] = [];
 
 console.log('Root: ' + ROOT);
 console.log('Folders Scanned: ' + topLevelFoldersForFiles(ROOT, files).join(' '));
@@ -290,12 +300,12 @@ for (const filePath of files) {
 	if (text !== original) {
 		fs.writeFileSync(filePath, text, 'utf8');
 		changed++;
-		changedRelativeToCwd.push(path.relative(process.cwd(), filePath));
+		changedRelativeToRoot.push(path.relative(ROOT, filePath));
 	}
 }
 
 console.log('Files Changed: ' + changed.toString());
-for (const rel of changedRelativeToCwd) {
+for (const rel of changedRelativeToRoot) {
 	console.log(`      ${rel}`);
 }
 console.log('');
