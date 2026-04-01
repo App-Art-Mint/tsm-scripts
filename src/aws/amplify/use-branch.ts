@@ -1,4 +1,4 @@
-import { ssoCommand } from '../sso-command';
+import { ssoCommand } from '../sso/command';
 
 const branch = process.argv[2];
 if (!branch) {
