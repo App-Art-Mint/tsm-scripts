@@ -275,6 +275,7 @@ const tsconfigEntries = loadTsConfigAliasEntries(ROOT);
 const files = await listTsFilesUnderRoot(ROOT);
 
 let changed = 0;
+const changedRelativeToCwd: string[] = [];
 
 console.log('Root: ' + ROOT);
 console.log('Folders Scanned: ' + topLevelFoldersForFiles(ROOT, files).join(' '));
@@ -289,7 +290,12 @@ for (const filePath of files) {
 	if (text !== original) {
 		fs.writeFileSync(filePath, text, 'utf8');
 		changed++;
+		changedRelativeToCwd.push(path.relative(process.cwd(), filePath));
 	}
 }
 
 console.log('Files Changed: ' + changed.toString());
+for (const rel of changedRelativeToCwd) {
+	console.log(`      ${rel}`);
+}
+console.log('');
