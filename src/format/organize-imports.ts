@@ -19,13 +19,33 @@ interface ParsedImport {
 	multi: boolean;
 }
 
-function walkTsFiles(dir: string, out: string[] = []): string[] {
+function walkTsFiles(dir: string, out: string[] = [], visitedDirs?: { count: number }): string[] {
+	if (visitedDirs) visitedDirs.count++;
 	for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
 		const p = path.join(dir, name.name);
-		if (name.isDirectory()) walkTsFiles(p, out);
+		if (name.isDirectory()) walkTsFiles(p, out, visitedDirs);
 		else if (name.isFile() && /\.(ts|tsx|tsm)$/i.test(name.name)) out.push(p);
 	}
 	return out;
+}
+
+function listImmediateSubfolders(root: string): string[] {
+	return fs
+		.readdirSync(root, { withFileTypes: true })
+		.filter((e) => e.isDirectory())
+		.map((e) => e.name)
+		.sort((a, b) => a.localeCompare(b, 'en'));
+}
+
+/** First path segment under `root` for each file (`.` = file directly under root). */
+function topLevelFoldersForFiles(root: string, files: string[]): string[] {
+	const set = new Set<string>();
+	for (const f of files) {
+		const rel = path.relative(root, f);
+		const parts = rel.split(/[/\\]/).filter(Boolean);
+		set.add(parts.length <= 1 ? '.' : parts[0]);
+	}
+	return [...set].sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 function getModuleSpecifier(text: string): string {
@@ -259,8 +279,16 @@ function organizeImports(sourceText: string, filePath: string, tsconfigEntries: 
 }
 
 let changed = 0;
-const files = walkTsFiles(ROOT);
+const visitedDirs = { count: 0 };
+const files = walkTsFiles(ROOT, [], visitedDirs);
 const tsconfigEntries = loadTsConfigAliasEntries(ROOT);
+
+console.log('Root: ' + ROOT);
+console.log('Direct subfolders of root (each is scanned recursively): ' + listImmediateSubfolders(ROOT).join(', '));
+console.log('Directories visited: ' + visitedDirs.count.toString());
+console.log('Top-level folders containing files to check: ' + topLevelFoldersForFiles(ROOT, files).join(', '));
+console.log('Files to check: ' + files.length.toString());
+console.log('');
 
 for (const filePath of files) {
 	let text = fs.readFileSync(filePath, 'utf8');
