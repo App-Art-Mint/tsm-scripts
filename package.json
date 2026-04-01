@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.14",
+	"version": "0.0.15",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
