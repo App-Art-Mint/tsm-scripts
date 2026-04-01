@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.16",
+	"version": "0.0.17",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
@@ -43,6 +43,7 @@
 		"aws:amplify:sandbox": "tsx src/aws/amplify/sandbox.ts",
 		"aws:sso:login": "tsx src/aws/sso/login.ts",
 		"format:imports": "tsx src/format/imports.ts",
+		"mint:update": "tsx src/mint/update.ts",
 		"tinify:inject": "tsx src/tinify/tinyify-inject-cert.ts"
 	},
 	"dependencies": {
