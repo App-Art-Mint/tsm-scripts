@@ -3,18 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
+import { getInvocationRoot } from '../util/cwd';
+
 const rootArg = process.argv[2];
 
-/** Directory where `npm` was run (set by npm before `--prefix` moves the script cwd into a package). */
-function defaultRootFromInvocation(): string {
-	const initCwd = process.env.INIT_CWD;
-	if (initCwd) {
-		return path.resolve(initCwd);
-	}
-	return process.cwd();
-}
-
-const ROOT = rootArg ? path.resolve(rootArg) : defaultRootFromInvocation();
+const ROOT = rootArg ? path.resolve(rootArg) : getInvocationRoot();
 
 type ImportGroup = 'external' | 'workspace' | 'local' | 'environment';
 

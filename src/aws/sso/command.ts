@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
-import { envFiles } from '../../env';
+import { envFiles } from '../../util/env';
 
 const ssoProfiles = envFiles
 	.map((file) => {
