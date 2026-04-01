@@ -1,3 +1,4 @@
+import { globby } from 'globby';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
@@ -19,22 +20,14 @@ interface ParsedImport {
 	multi: boolean;
 }
 
-function walkTsFiles(dir: string, out: string[] = [], visitedDirs?: { count: number }): string[] {
-	if (visitedDirs) visitedDirs.count++;
-	for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
-		const p = path.join(dir, name.name);
-		if (name.isDirectory()) walkTsFiles(p, out, visitedDirs);
-		else if (name.isFile() && /\.(ts|tsx|tsm)$/i.test(name.name)) out.push(p);
-	}
-	return out;
-}
-
-function listImmediateSubfolders(root: string): string[] {
-	return fs
-		.readdirSync(root, { withFileTypes: true })
-		.filter((e) => e.isDirectory())
-		.map((e) => e.name)
-		.sort((a, b) => a.localeCompare(b, 'en'));
+async function listTsFilesUnderRoot(root: string): Promise<string[]> {
+	return globby(['**/*.ts', '**/*.tsx', '**/*.tsm'], {
+		cwd: root,
+		absolute: true,
+		gitignore: true,
+		caseSensitiveMatch: false,
+		ignore: ['**/.git/**']
+	});
 }
 
 /** First path segment under `root` for each file (`.` = file directly under root). */
@@ -278,17 +271,14 @@ function organizeImports(sourceText: string, filePath: string, tsconfigEntries: 
 	return result;
 }
 
-let changed = 0;
-const visitedDirs = { count: 0 };
-const files = walkTsFiles(ROOT, [], visitedDirs);
 const tsconfigEntries = loadTsConfigAliasEntries(ROOT);
+const files = await listTsFilesUnderRoot(ROOT);
+
+let changed = 0;
 
 console.log('Root: ' + ROOT);
-console.log('Direct subfolders of root (each is scanned recursively): ' + listImmediateSubfolders(ROOT).join(', '));
-console.log('Directories visited: ' + visitedDirs.count.toString());
-console.log('Top-level folders containing files to check: ' + topLevelFoldersForFiles(ROOT, files).join(', '));
-console.log('Files to check: ' + files.length.toString());
-console.log('');
+console.log('Folders Scanned: ' + topLevelFoldersForFiles(ROOT, files).join(' '));
+console.log('Files Scanned: ' + files.length.toString());
 
 for (const filePath of files) {
 	let text = fs.readFileSync(filePath, 'utf8');
@@ -302,4 +292,4 @@ for (const filePath of files) {
 	}
 }
 
-console.log('Updated ' + changed.toString() + ' / ' + files.length.toString() + ' files.');
+console.log('Files Changed: ' + changed.toString());

@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
@@ -47,6 +47,7 @@
 		"cross-replace": "^0.2.0",
 		"eslint": "^10.0.3",
 		"glob": "^13.0.6",
+		"globby": "^14.1.0",
 		"globals": "^17.4.0",
 		"jiti": "^2.6.1",
 		"madge": "^8.0.0",
