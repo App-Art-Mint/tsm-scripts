@@ -1,5 +1,7 @@
-import { spawn } from 'child_process';
-import fs from 'fs';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+
+import { getInvocationRoot } from '../../util/cwd';
 import { envFiles } from '../../util/env';
 
 const ssoProfiles = envFiles
@@ -19,8 +21,9 @@ const profileArgs = isSSO ? ' --profile $AWS_SSO_PROFILE' : '';
 export function ssoCommand(command: string): void {
 	const fullCommand = `${envCommand}${command}${profileArgs}`;
 	const child = spawn(fullCommand, {
-		stdio: 'inherit',
+		cwd: getInvocationRoot(),
 		shell: true,
+		stdio: 'inherit'
 	});
 
 	child.on('error', (err) => {
