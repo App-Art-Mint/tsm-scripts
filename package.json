@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
@@ -41,13 +41,15 @@
 		"format:imports": "tsx src/format/imports.ts",
 		"tinify:inject": "tsx src/tinify/tinyify-inject-cert.ts"
 	},
+	"dependencies": {
+		"globby": "^14.1.0"
+	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^25.4.0",
 		"cross-replace": "^0.2.0",
 		"eslint": "^10.0.3",
 		"glob": "^13.0.6",
-		"globby": "^14.1.0",
 		"globals": "^17.4.0",
 		"jiti": "^2.6.1",
 		"madge": "^8.0.0",
