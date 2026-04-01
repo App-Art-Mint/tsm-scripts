@@ -23,7 +23,7 @@ function walkTsFiles(dir: string, out: string[] = []): string[] {
 	for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
 		const p = path.join(dir, name.name);
 		if (name.isDirectory()) walkTsFiles(p, out);
-		else if (name.isFile() && name.name.endsWith('.ts')) out.push(p);
+		else if (name.isFile() && /\.(ts|tsx|tsm)$/i.test(name.name)) out.push(p);
 	}
 	return out;
 }
@@ -85,7 +85,13 @@ function resolveLocalAliasPrefixes(filePath: string, tsconfigEntries: TsConfigAl
 
 function classify(spec: string, localAliasPrefixes: string[]): ImportGroup {
 	if (!spec) return 'external';
-	if (spec.includes('/environments/') || spec.includes('environments/environment') || spec.includes('.env')) return 'environment';
+	if (
+		spec.startsWith('$amplify/env') ||
+		spec.includes('/environments/') ||
+		spec.includes('environments/environment') ||
+		spec.includes('.env')
+	)
+		return 'environment';
 	if (spec.startsWith('@app-art-mint/') || spec.startsWith('@appartmint/')) return 'workspace';
 	if (localAliasPrefixes.some((prefix) => spec === prefix || spec.startsWith(prefix))) return 'local';
 	if (spec.startsWith('.') || spec.startsWith('..')) return 'local';
@@ -99,12 +105,6 @@ function groupOrder(g: ImportGroup): number {
 
 function isMultiLineImport(text: string): boolean {
 	return text.includes('\n');
-}
-
-function fileUsesSemicolon(sourceText: string, importTexts: string[]): boolean {
-	if (importTexts.some((t) => /;\s*$/.test(t))) return true;
-	const sample = sourceText.slice(0, 2000);
-	return /import[^;]+;\s*\n/.test(sample);
 }
 
 function normalizeImportLine(text: string): string {
@@ -145,18 +145,64 @@ function wrapImportIfNeeded(text: string, maxLen: number, semicolon: boolean): s
 	return ensureSemicolon(body, semicolon);
 }
 
-function sortKey(spec: string): string {
-	if (spec.startsWith('@')) return spec.slice(1);
-	return spec;
+/** First npm-style path segment; for `@scope/pkg/...` uses `scope` so it groups with unscoped `scope/...`. */
+function externalFamilyKey(spec: string): string {
+	if (spec.startsWith('@')) {
+		const rest = spec.slice(1);
+		const slash = rest.indexOf('/');
+		const head = slash === -1 ? rest : rest.slice(0, slash);
+		return head.toLowerCase();
+	}
+	const slash = spec.indexOf('/');
+	const head = slash === -1 ? spec : spec.slice(0, slash);
+	return head.toLowerCase();
 }
 
-function compareSpec(a: string, b: string): number {
-	return sortKey(a).localeCompare(sortKey(b), 'en');
+/** Within the same family: scoped (`@`) imports first, then unscoped (`pkg`, `pkg/sub`). */
+function compareExternal(a: string, b: string): number {
+	const fa = externalFamilyKey(a);
+	const fb = externalFamilyKey(b);
+	const byFamily = fa.localeCompare(fb, 'en');
+	if (byFamily !== 0) return byFamily;
+
+	const scopedRank = (s: string) => (s.startsWith('@') ? 0 : 1);
+	const sr = scopedRank(a) - scopedRank(b);
+	if (sr !== 0) return sr;
+
+	return a.localeCompare(b, 'en');
 }
 
+function workspaceScopeOrder(spec: string): number {
+	if (spec.startsWith('@appartmint/')) return 0;
+	if (spec.startsWith('@app-art-mint/')) return 1;
+	return 2;
+}
+
+function compareWorkspace(a: string, b: string): number {
+	const oa = workspaceScopeOrder(a);
+	const ob = workspaceScopeOrder(b);
+	if (oa !== ob) return oa - ob;
+	return a.localeCompare(b, 'en');
+}
+
+function isRelativeLocalSpecifier(spec: string): boolean {
+	return spec.startsWith('.') || spec.startsWith('..');
+}
+
+/** Tsconfig path aliases before `./` / `../` imports. */
+function compareLocal(a: string, b: string): number {
+	const ra = isRelativeLocalSpecifier(a);
+	const rb = isRelativeLocalSpecifier(b);
+	if (ra !== rb) return ra ? 1 : -1;
+	return a.localeCompare(b, 'en');
+}
+
+function scriptKindForPath(filePath: string): ts.ScriptKind {
+	return filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+}
 
 function organizeImports(sourceText: string, filePath: string, tsconfigEntries: TsConfigAliasEntry[]): string {
-	const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, scriptKindForPath(filePath));
 	const localAliasPrefixes = resolveLocalAliasPrefixes(filePath, tsconfigEntries);
 
 	let i = 0;
@@ -170,21 +216,37 @@ function organizeImports(sourceText: string, filePath: string, tsconfigEntries: 
 
 	const importTexts = importNodes.map((node) => sourceText.slice(node.getStart(sf), node.end).trim());
 
-	const semicolon = fileUsesSemicolon(sourceText, importTexts);
-
 	const parsed: ParsedImport[] = importTexts.map((trimmed) => {
 		const spec = getModuleSpecifier(trimmed);
 		const group = classify(spec, localAliasPrefixes);
-		const wrapped = wrapImportIfNeeded(trimmed, 100, semicolon);
+		const wrapped = wrapImportIfNeeded(trimmed, 100, true);
 		return { spec, group, finalText: wrapped, multi: isMultiLineImport(wrapped) };
 	});
 
 	parsed.sort((a, b) => {
+		// All single-line imports (every group, in group order) before any multi-line import.
+		if (a.multi !== b.multi) return a.multi ? 1 : -1;
+
 		const go = groupOrder(a.group) - groupOrder(b.group);
 		if (go !== 0) return go;
-		const cmp = compareSpec(a.spec, b.spec);
+
+		let cmp = 0;
+		switch (a.group) {
+			case 'external':
+				cmp = compareExternal(a.spec, b.spec);
+				break;
+			case 'workspace':
+				cmp = compareWorkspace(a.spec, b.spec);
+				break;
+			case 'local':
+				cmp = compareLocal(a.spec, b.spec);
+				break;
+			case 'environment':
+				cmp = a.spec.localeCompare(b.spec, 'en');
+				break;
+		}
 		if (cmp !== 0) return cmp;
-		if (a.multi !== b.multi) return a.multi ? 1 : -1;
+
 		return a.finalText.localeCompare(b.finalText);
 	});
 
@@ -205,7 +267,6 @@ for (const filePath of files) {
 	const original = text;
 
 	text = organizeImports(text, filePath, tsconfigEntries);
-	text = text.replace(/\n{3,}(\/\*\*)/g, '\n\n$1');
 
 	if (text !== original) {
 		fs.writeFileSync(filePath, text, 'utf8');
