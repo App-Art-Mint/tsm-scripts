@@ -24,9 +24,10 @@ function normalizeJsonText(s: string): string {
 
 const projectPkgPath = path.join(ROOT, 'package.json');
 const projectPkg = readPackageJsonFile(projectPkgPath);
-const version = process.env.npm_package_version ?? projectPkg.version;
+/** Prefer the workspace `package.json` at ROOT. `npm_package_version` is wrong when the script runs with `--prefix` (it would be tsm-scripts' version, not the app's). */
+const version = projectPkg.version ?? process.env.npm_package_version;
 if (version === undefined || version === '') {
-	throw new Error(`Set version in ${projectPkgPath}, or run via npm so npm_package_version is set`);
+	throw new Error(`Set "version" in ${projectPkgPath}`);
 }
 
 function resolveRootDependency(name: string): string | undefined {
