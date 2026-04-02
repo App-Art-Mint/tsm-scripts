@@ -4,6 +4,9 @@ import path from 'node:path';
 
 import { getInvocationRoot } from '../util/cwd';
 
+/** Cannot `npm install` this package while a script from it is running (folder lock on Windows, etc.). */
+const PACKAGE_SELF = '@appartmint/tsm-scripts';
+
 /** `dependencies`: these scopes → `npm i …@latest` */
 const PREFIXES_PROD = ['@awesome.me/', '@app-art-mint/', '@appartmint/'];
 
@@ -70,6 +73,10 @@ function pickPackages(
 	return keys.sort((a, b) => a.localeCompare(b, 'en'));
 }
 
+function withoutSelf(packages: string[]): string[] {
+	return packages.filter((p) => p !== PACKAGE_SELF);
+}
+
 interface PackageJson {
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
@@ -114,18 +121,27 @@ const prod = pickPackages(pkg.dependencies, 'prod');
 const dev = pickPackages(pkg.devDependencies, 'devPeer');
 const peer = pickPackages(pkg.peerDependencies, 'devPeer');
 
-const allNames = [...new Set([...prod, ...dev, ...peer])].sort((a, b) => a.localeCompare(b, 'en'));
+const skippedSelf =
+	prod.includes(PACKAGE_SELF) || dev.includes(PACKAGE_SELF) || peer.includes(PACKAGE_SELF);
+
+const prodRun = withoutSelf(prod);
+const devRun = withoutSelf(dev);
+const peerRun = withoutSelf(peer);
+
+const allNames = [...new Set([...prodRun, ...devRun, ...peerRun])].sort((a, b) =>
+	a.localeCompare(b, 'en')
+);
 const before = snapshotVersions(ROOT, allNames);
 
 let ok = true;
-if (prod.length > 0) {
-	ok = runNpmInstallLatest(ROOT, prod, []) && ok;
+if (prodRun.length > 0) {
+	ok = runNpmInstallLatest(ROOT, prodRun, []) && ok;
 }
-if (dev.length > 0) {
-	ok = runNpmInstallLatest(ROOT, dev, ['-D']) && ok;
+if (devRun.length > 0) {
+	ok = runNpmInstallLatest(ROOT, devRun, ['-D']) && ok;
 }
-if (peer.length > 0) {
-	ok = runNpmInstallLatest(ROOT, peer, ['--save-peer']) && ok;
+if (peerRun.length > 0) {
+	ok = runNpmInstallLatest(ROOT, peerRun, ['--save-peer']) && ok;
 }
 
 const after = snapshotVersions(ROOT, allNames);
@@ -144,6 +160,12 @@ const changedCount = changed.length;
 
 console.log('Root: ' + ROOT);
 console.log('Filter: ' + (FILTER === 'all' ? 'all' : FILTER));
+if (skippedSelf) {
+	console.log(
+		'Skipped: ' + PACKAGE_SELF +
+		' (cannot replace this package while a script from it is running)'
+	);
+}
 console.log('Dependencies Synced: ' + syncedCount.toString());
 console.log('Dependencies Changed: ' + changedCount.toString());
 console.log('');
