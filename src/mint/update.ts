@@ -10,21 +10,64 @@ const PREFIXES_PROD = ['@awesome.me/', '@app-art-mint/', '@appartmint/'];
 /** `devDependencies` / `peerDependencies`: only these scopes */
 const PREFIXES_DEV_PEER = ['@app-art-mint/', '@appartmint/'];
 
-const rootArg = process.argv[2];
-const ROOT = rootArg ? path.resolve(rootArg) : getInvocationRoot();
+const FILTER_MODES = ['ngx', 'amp', 'mint', 'icons'] as const;
+type FilterMode = (typeof FILTER_MODES)[number];
+
+function isFilterMode(value: string | undefined): value is FilterMode {
+	return value !== undefined && (FILTER_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * `argv[2]`: optional `ngx` | `amp` | `mint` | `icons`, or a path override for root.
+ * When `argv[2]` is a filter mode, optional `argv[3]` is the root path.
+ */
+function parseRootAndMode(): { root: string; mode: FilterMode | 'all' } {
+	const arg2 = process.argv[2];
+	const arg3 = process.argv[3];
+	if (isFilterMode(arg2)) {
+		return {
+			mode: arg2,
+			root: arg3 ? path.resolve(arg3) : getInvocationRoot()
+		};
+	}
+	return {
+		mode: 'all',
+		root: arg2 ? path.resolve(arg2) : getInvocationRoot()
+	};
+}
+
+const { root: ROOT, mode: FILTER } = parseRootAndMode();
 
 function matchesPrefix(name: string, prefixes: string[]): boolean {
 	return prefixes.some((p) => name.startsWith(p));
 }
 
+function matchesModeFilter(name: string, mode: FilterMode): boolean {
+	switch (mode) {
+		case 'ngx':
+			return name.startsWith('@app-art-mint/ngx-');
+		case 'amp':
+			return name.startsWith('@app-art-mint/amp-');
+		case 'mint':
+			return name.startsWith('@appartmint/');
+		case 'icons':
+			return name.startsWith('@awesome.me/');
+	}
+}
+
 function pickPackages(
 	section: Record<string, string> | undefined,
-	prefixes: string[]
+	sectionKind: 'prod' | 'devPeer'
 ): string[] {
 	if (!section) return [];
-	return Object.keys(section)
-		.filter((n) => matchesPrefix(n, prefixes))
-		.sort((a, b) => a.localeCompare(b, 'en'));
+	const keys = Object.keys(section).filter((n) => {
+		if (FILTER === 'all') {
+			const prefixes = sectionKind === 'prod' ? PREFIXES_PROD : PREFIXES_DEV_PEER;
+			return matchesPrefix(n, prefixes);
+		}
+		return matchesModeFilter(n, FILTER);
+	});
+	return keys.sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 interface PackageJson {
@@ -67,9 +110,9 @@ function runNpmInstallLatest(
 }
 
 const pkg = readPackageJson(ROOT);
-const prod = pickPackages(pkg.dependencies, PREFIXES_PROD);
-const dev = pickPackages(pkg.devDependencies, PREFIXES_DEV_PEER);
-const peer = pickPackages(pkg.peerDependencies, PREFIXES_DEV_PEER);
+const prod = pickPackages(pkg.dependencies, 'prod');
+const dev = pickPackages(pkg.devDependencies, 'devPeer');
+const peer = pickPackages(pkg.peerDependencies, 'devPeer');
 
 const allNames = [...new Set([...prod, ...dev, ...peer])].sort((a, b) => a.localeCompare(b, 'en'));
 const before = snapshotVersions(ROOT, allNames);
@@ -100,6 +143,7 @@ const syncedCount = allNames.length;
 const changedCount = changed.length;
 
 console.log('Root: ' + ROOT);
+console.log('Filter: ' + (FILTER === 'all' ? 'all' : FILTER));
 console.log('Dependencies Synced: ' + syncedCount.toString());
 console.log('Dependencies Changed: ' + changedCount.toString());
 console.log('');
