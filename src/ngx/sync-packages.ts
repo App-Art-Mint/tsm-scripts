@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-
 import { getInvocationRoot } from '../util/cwd';
 
 const rootArg = process.argv[2];

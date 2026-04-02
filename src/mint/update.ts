@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-
 import { getInvocationRoot } from '../util/cwd';
 
 /** Cannot `npm install` this package while a script from it is running (folder lock on Windows, etc.). */
