@@ -77,6 +77,7 @@ function withoutSelf(packages: string[]): string[] {
 }
 
 interface PackageJson {
+	name?: string;
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 	peerDependencies?: Record<string, string>;
@@ -115,13 +116,58 @@ function runNpmInstallLatest(
 	return (result.status ?? 1) === 0;
 }
 
+/** True when `mint:update` is run with the invocation root at this repo (not a consumer app). */
+function isMintScriptsOwnProject(root: string): boolean {
+	return readPackageJson(root).name === PACKAGE_SELF;
+}
+
+const SELF_UPDATE_COMMAND = `npm i -D ${PACKAGE_SELF}@latest`;
+
+/**
+ * When run from a consumer app, if a newer `@appartmint/tsm-scripts` exists on the registry, print a copy-paste
+ * install line (cannot be applied from inside this running script). Skipped when the script is run from this package's repo.
+ */
+function printSelfUpdateHintIfNeeded(root: string): void {
+	if (isMintScriptsOwnProject(root)) {
+		return;
+	}
+
+	const result = spawnSync('npm', ['outdated', PACKAGE_SELF, '--json'], {
+		cwd: root,
+		encoding: 'utf8',
+		shell: true
+	});
+	const rawOut = result.stdout;
+	const stdout = typeof rawOut === 'string' ? rawOut.trim() : '';
+	if (stdout === '' || stdout === '{}' || stdout === 'null') {
+		return;
+	}
+
+	let parsed: Record<string, { latest?: string; current?: string }>;
+	try {
+		parsed = JSON.parse(stdout) as Record<string, { latest?: string; current?: string }>;
+	} catch {
+		return;
+	}
+
+	if (!(PACKAGE_SELF in parsed)) {
+		return;
+	}
+	const row = parsed[PACKAGE_SELF];
+	if (row.latest === undefined || row.current === undefined || row.latest === row.current) {
+		return;
+	}
+
+	console.log('This package needs to be updated by itself:');
+	console.log('');
+	console.log(SELF_UPDATE_COMMAND);
+	console.log('');
+}
+
 const pkg = readPackageJson(ROOT);
 const prod = pickPackages(pkg.dependencies, 'prod');
 const dev = pickPackages(pkg.devDependencies, 'devPeer');
 const peer = pickPackages(pkg.peerDependencies, 'devPeer');
-
-const skippedSelf =
-	prod.includes(PACKAGE_SELF) || dev.includes(PACKAGE_SELF) || peer.includes(PACKAGE_SELF);
 
 const prodRun = withoutSelf(prod);
 const devRun = withoutSelf(dev);
@@ -159,12 +205,6 @@ const changedCount = changed.length;
 
 console.log('Root: ' + ROOT);
 console.log('Filter: ' + (FILTER === 'all' ? 'all' : FILTER));
-if (skippedSelf) {
-	console.log(
-		'Skipped: ' + PACKAGE_SELF +
-		' (cannot replace this package while a script from it is running)'
-	);
-}
 console.log('Dependencies Synced: ' + syncedCount.toString());
 console.log('Dependencies Changed: ' + changedCount.toString());
 console.log('');
@@ -172,5 +212,7 @@ for (const c of changed) {
 	console.log(`\t${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`);
 }
 console.log('');
+
+printSelfUpdateHintIfNeeded(ROOT);
 
 process.exit(ok ? 0 : 1);
