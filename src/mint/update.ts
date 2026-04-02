@@ -148,7 +148,7 @@ console.log('Dependencies Synced: ' + syncedCount.toString());
 console.log('Dependencies Changed: ' + changedCount.toString());
 console.log('');
 for (const c of changed) {
-	console.log(`      ${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`);
+	console.log(`\t${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`);
 }
 console.log('');
 

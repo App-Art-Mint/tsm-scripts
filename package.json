@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.0.19",
+	"version": "0.0.20",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
@@ -44,7 +44,9 @@
 		"aws:sso:login": "tsx src/aws/sso/login.ts",
 		"format:imports": "tsx src/format/imports.ts",
 		"mint:update": "tsx src/mint/update.ts",
-		"tinify:inject": "tsx src/tinify/inject-cert.ts"
+		"tinify:inject": "tsx src/tinify/inject-cert.ts",
+		"ngx:sync": "tsx src/ngx/sync-packages.ts",
+		"ngx:build": "tsx src/ngx/build-libraries.ts"
 	},
 	"dependencies": {
 		"globby": "^14.1.0"

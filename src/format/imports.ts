@@ -299,6 +299,6 @@ for (const filePath of files) {
 
 console.log('Files Changed: ' + changed.toString());
 for (const rel of changedRelativeToRoot) {
-	console.log(`      ${rel}`);
+	console.log(`\t${rel}`);
 }
 console.log('');
