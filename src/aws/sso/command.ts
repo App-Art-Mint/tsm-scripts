@@ -21,12 +21,15 @@ const profileArgs = isSSO ? ' --profile $AWS_SSO_PROFILE' : '';
 /**
  * Spawn a long-lived shell command and exit this process on `'spawn'` so tsx / Node releases
  * `node_modules` (e.g. you can `npm i` while `ampx sandbox` runs). Logs stay on this terminal via
- * `stdio: 'inherit'`; the child keeps running in the background.
+ * `stdio: 'inherit'`.
+ *
+ * On Windows, `detached: true` can open a **new console**; we only set it on non-Windows so the
+ * sandbox streams in the same window. `unref()` still lets this process exit right after spawn.
  */
 function spawnDetachedAndExit(fullCommand: string, cwd: string): void {
 	const child = spawn(fullCommand, {
 		cwd,
-		detached: true,
+		detached: process.platform !== 'win32',
 		shell: true,
 		stdio: 'inherit'
 	});
