@@ -68,8 +68,8 @@ function topologicalSort(libraries: Record<string, string[]>): string[] {
 }
 
 const srcDir = path.join(ROOT, 'src');
-const dependencies: Record<string, string[]> = {};
 
+const libEntries: { name: string; ngxPeersAll: string[] }[] = [];
 for (const dir of fs.readdirSync(srcDir)) {
 	if (!dir.toLowerCase().startsWith('ngx-')) continue;
 	const pkgPath = path.join(srcDir, dir, 'package.json');
@@ -79,10 +79,17 @@ for (const dir of fs.readdirSync(srcDir)) {
 		continue;
 	}
 	const pkg = readLibraryPackage(pkgPath);
-	const ngxPeers = Object.keys(pkg.peerDependencies ?? {}).filter((dep) =>
+	const ngxPeersAll = Object.keys(pkg.peerDependencies ?? {}).filter((dep) =>
 		dep.startsWith('@app-art-mint/ngx-')
 	);
-	dependencies[pkg.name] = ngxPeers;
+	libEntries.push({ name: pkg.name, ngxPeersAll });
+}
+
+/** Only edges between libraries in this repo; peers satisfied from npm are ignored for ordering. */
+const localNames = new Set(libEntries.map((e) => e.name));
+const dependencies: Record<string, string[]> = {};
+for (const e of libEntries) {
+	dependencies[e.name] = e.ngxPeersAll.filter((dep) => localNames.has(dep));
 }
 
 const libraries = topologicalSort(dependencies);
