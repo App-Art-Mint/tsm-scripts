@@ -47,6 +47,9 @@ const libraries = fs
 	})
 	.map((dir) => readPackageJsonFile(path.join(srcDir, dir, 'package.json')));
 
+/** `ngx-*` libraries that live under this repo’s `src/` (monorepo libs). External `@app-art-mint/ngx-*` from npm use the root `package.json` range instead of `^${version}`. */
+const localNgxLibNames = new Set(libraries.map((p) => p.name));
+
 const scannedCount = libraries.length;
 
 console.log('Root: ' + ROOT);
@@ -82,7 +85,7 @@ for (const pkg of libraries) {
 			peers[dep] = `^${angularMajor}.0.0`;
 			continue;
 		}
-		if (dep.startsWith('@app-art-mint/ngx-')) {
+		if (dep.startsWith('@app-art-mint/ngx-') && localNgxLibNames.has(dep)) {
 			peers[dep] = `^${version}`;
 			continue;
 		}
