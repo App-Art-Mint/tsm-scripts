@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getInvocationRoot } from '../util/cwd';
@@ -103,8 +103,17 @@ for (const lib of libraries) {
 console.log('');
 
 for (const lib of libraries) {
-	execSync(`ng build ${lib.replace('@app-art-mint/', '')}`, {
+	const project = lib.replace('@app-art-mint/', '');
+	const result = spawnSync('npx', ['ng', 'build', project], {
 		cwd: ROOT,
+		shell: process.platform === 'win32',
 		stdio: 'inherit'
 	});
+	if (result.error) {
+		throw result.error;
+	}
+	const code = result.status;
+	if (code !== 0 && code !== null) {
+		process.exit(code);
+	}
 }
