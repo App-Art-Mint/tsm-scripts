@@ -18,18 +18,10 @@ const envArgs = envFiles.map((file) => `-f ${file} `).join('');
 const envCommand = (isSSO ? `npx dotenvx run ${envArgs}-- ` : '') + 'cross-replace ';
 const profileArgs = isSSO ? ' --profile $AWS_SSO_PROFILE' : '';
 
-/**
- * Spawn a long-lived shell command and exit this process on `'spawn'` so tsx / Node releases
- * `node_modules` (e.g. you can `npm i` while `ampx sandbox` runs). Logs stay on this terminal via
- * `stdio: 'inherit'`.
- *
- * On Windows, `detached: true` can open a **new console**; we only set it on non-Windows so the
- * sandbox streams in the same window. `unref()` still lets this process exit right after spawn.
- */
-function spawnDetachedAndExit(fullCommand: string, cwd: string): void {
+export function ssoCommand(command: string): void {
+	const fullCommand = `${envCommand}${command}${profileArgs}`;
 	const child = spawn(fullCommand, {
-		cwd,
-		detached: process.platform !== 'win32',
+		cwd: getInvocationRoot(),
 		shell: true,
 		stdio: 'inherit'
 	});
@@ -39,13 +31,9 @@ function spawnDetachedAndExit(fullCommand: string, cwd: string): void {
 		process.exit(1);
 	});
 
-	child.on('spawn', () => {
-		child.unref();
-		process.exit(0);
+	child.on('exit', (code) => {
+		if (code !== 0) {
+			process.exit(code ?? 1);
+		}
 	});
-}
-
-export function ssoCommand(command: string): void {
-	const fullCommand = `${envCommand}${command}${profileArgs}`;
-	spawnDetachedAndExit(fullCommand, getInvocationRoot());
 }
