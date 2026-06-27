@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getInvocationRoot } from '../util/cwd';
+import { logCard } from '../util/ui';
 
 /** Cannot `npm install` this package while a script from it is running (folder lock on Windows, etc.). */
 const PACKAGE_SELF = '@appartmint/tsm-scripts';
@@ -111,8 +112,8 @@ function runNpmInstallLatest(
 	extraArgs: string[]
 ): boolean {
 	if (packages.length === 0) return true;
-	const args = ['i', ...extraArgs, ...packages.map((p) => `${p}@latest`)];
-	const result = spawnSync('npm', args, { cwd: root, shell: true, stdio: 'inherit' });
+	const command = ['npm', 'i', ...extraArgs, ...packages.map((p) => `${p}@latest`)].join(' ');
+	const result = spawnSync(command, { cwd: root, shell: true, stdio: 'inherit' });
 	return (result.status ?? 1) === 0;
 }
 
@@ -132,7 +133,7 @@ function printSelfUpdateHintIfNeeded(root: string): void {
 		return;
 	}
 
-	const result = spawnSync('npm', ['outdated', PACKAGE_SELF, '--json'], {
+	const result = spawnSync(`npm outdated ${PACKAGE_SELF} --json`, {
 		cwd: root,
 		encoding: 'utf8',
 		shell: true
@@ -203,15 +204,15 @@ for (const name of allNames) {
 const syncedCount = allNames.length;
 const changedCount = changed.length;
 
-console.log('Root: ' + ROOT);
-console.log('Filter: ' + (FILTER === 'all' ? 'all' : FILTER));
-console.log('Dependencies Synced: ' + syncedCount.toString());
-console.log('Dependencies Changed: ' + changedCount.toString());
-console.log('');
-for (const c of changed) {
-	console.log(`\t${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`);
-}
-console.log('');
+logCard({
+	lines: [
+		'Root: ' + ROOT,
+		'Filter: ' + (FILTER === 'all' ? 'all' : FILTER),
+		'Dependencies Synced:  ' + syncedCount.toString(),
+		'Dependencies Changed: ' + changedCount.toString(),
+		...changed.map(c => `\t${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`),
+	],
+});
 
 printSelfUpdateHintIfNeeded(ROOT);
 

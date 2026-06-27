@@ -95,7 +95,7 @@ for (const e of libEntries) {
 const libraries = topologicalSort(dependencies);
 
 console.log('Root: ' + ROOT);
-console.log('Libraries Built: ' + libraries.length.toString());
+console.log('Libraries Queued: ' + libraries.length.toString());
 console.log('Build Order:');
 for (const lib of libraries) {
 	console.log(`\t${lib}`);
@@ -104,9 +104,9 @@ console.log('');
 
 for (const lib of libraries) {
 	const project = lib.replace('@app-art-mint/', '');
-	const result = spawnSync('npx', ['ng', 'build', project], {
+	const result = spawnSync(`npx ng build ${project}`, {
 		cwd: ROOT,
-		shell: process.platform === 'win32',
+		shell: true,
 		stdio: 'inherit'
 	});
 	if (result.error) {
@@ -117,3 +117,5 @@ for (const lib of libraries) {
 		process.exit(code);
 	}
 }
+
+console.log(`${libraries.length.toString()} Libraries Built\n\n`);

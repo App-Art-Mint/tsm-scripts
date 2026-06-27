@@ -123,28 +123,24 @@ function isMultiLineImport(text: string): boolean {
 }
 
 function normalizeImportLine(text: string): string {
-	let s = text.replace(/\s+/g, ' ').replace(/;+\s*$/, '').trim();
+	let s = text.replace(/\s+/g, ' ').trim();
+	s = s.replace(/\s*;\s*$/, ';');
 	s = s.replace(/,\s*\}(?=\s+from\s+)/g, ' }');
 	s = s.replace(/([\w$])}(?=\s+from\s+)/g, '$1 }');
 	return s;
 }
 
-function ensureSemicolon(text: string, semicolon: boolean): string {
-	const t = text.replace(/;+\s*$/, '').trimEnd();
-	return semicolon ? `${t};` : t;
-}
-
-function wrapImportIfNeeded(text: string, maxLen: number, semicolon: boolean): string {
+function wrapImportIfNeeded(text: string, maxLen: number): string {
 	const normalized = normalizeImportLine(text);
-	if (normalized.length <= maxLen) return ensureSemicolon(normalized, semicolon);
+	if (normalized.length <= maxLen) return normalized;
 
-	const fromMatch = /^(.+?)\s+from\s+(['"][^'"]+['"])$/.exec(normalized);
-	if (!fromMatch) return ensureSemicolon(normalized, semicolon);
+	const fromMatch = /^(.+?)\s+from\s+(['"][^'"]+['"])\s*;?\s*$/.exec(normalized);
+	if (!fromMatch) return normalized;
 
 	const head = fromMatch[1].trim();
 	const fromPart = fromMatch[2];
 	const m = /^(import\s+(?:type\s+)?)(\{)(.*)(\})\s*$/.exec(head);
-	if (!m) return ensureSemicolon(normalized, semicolon);
+	if (!m) return normalized;
 
 	const prefix = m[1];
 	const inner = m[3];
@@ -152,12 +148,11 @@ function wrapImportIfNeeded(text: string, maxLen: number, semicolon: boolean): s
 		.split(',')
 		.map((s) => s.trim())
 		.filter(Boolean);
-	if (names.length <= 1) return ensureSemicolon(normalized, semicolon);
+	if (names.length <= 1) return normalized;
 
 	const innerIndent = '\t';
 	const lines = names.map((n) => `${innerIndent}${n},`);
-	const body = `${prefix}{\n${lines.join('\n')}\n} from ${fromPart}`;
-	return ensureSemicolon(body, semicolon);
+	return `${prefix}{\n${lines.join('\n')}\n} from ${fromPart}`;
 }
 
 /** First npm-style path segment; for `@scope/pkg/...` uses `scope` so it groups with unscoped `scope/...`. */
@@ -234,7 +229,7 @@ function organizeImports(sourceText: string, filePath: string, tsconfigEntries: 
 	const parsed: ParsedImport[] = importTexts.map((trimmed) => {
 		const spec = getModuleSpecifier(trimmed);
 		const group = classify(spec, localAliasPrefixes);
-		const wrapped = wrapImportIfNeeded(trimmed, 100, true);
+		const wrapped = wrapImportIfNeeded(trimmed, 100);
 		return { spec, group, finalText: wrapped, multi: isMultiLineImport(wrapped) };
 	});
 
