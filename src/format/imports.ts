@@ -4,7 +4,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { getInvocationRoot } from '../util/cwd';
 
-const MAX_IMPORT_LINE_LENGTH = 64;
+const MAX_IMPORT_LINE_LENGTH = 100;
 
 const rootArg = process.argv[2];
 
