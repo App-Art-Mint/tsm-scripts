@@ -4,6 +4,8 @@ import path from 'node:path';
 import ts from 'typescript';
 import { getInvocationRoot } from '../util/cwd';
 
+const MAX_IMPORT_LINE_LENGTH = 64;
+
 const rootArg = process.argv[2];
 
 const ROOT = rootArg ? path.resolve(rootArg) : getInvocationRoot();
@@ -124,15 +126,15 @@ function isMultiLineImport(text: string): boolean {
 
 function normalizeImportLine(text: string): string {
 	let s = text.replace(/\s+/g, ' ').trim();
-	s = s.replace(/\s*;\s*$/, ';');
+	s = s.replace(/\s*;?\s*$/, '') + ';';
 	s = s.replace(/,\s*\}(?=\s+from\s+)/g, ' }');
 	s = s.replace(/([\w$])}(?=\s+from\s+)/g, '$1 }');
 	return s;
 }
 
-function wrapImportIfNeeded(text: string, maxLen: number): string {
+function wrapImportIfNeeded(text: string): string {
 	const normalized = normalizeImportLine(text);
-	if (normalized.length <= maxLen) return normalized;
+	if (normalized.length <= MAX_IMPORT_LINE_LENGTH) return normalized;
 
 	const fromMatch = /^(.+?)\s+from\s+(['"][^'"]+['"])\s*;?\s*$/.exec(normalized);
 	if (!fromMatch) return normalized;
@@ -152,7 +154,7 @@ function wrapImportIfNeeded(text: string, maxLen: number): string {
 
 	const innerIndent = '\t';
 	const lines = names.map((n) => `${innerIndent}${n},`);
-	return `${prefix}{\n${lines.join('\n')}\n} from ${fromPart}`;
+	return `${prefix}{\n${lines.join('\n')}\n} from ${fromPart};`;
 }
 
 /** First npm-style path segment; for `@scope/pkg/...` uses `scope` so it groups with unscoped `scope/...`. */
@@ -229,7 +231,7 @@ function organizeImports(sourceText: string, filePath: string, tsconfigEntries: 
 	const parsed: ParsedImport[] = importTexts.map((trimmed) => {
 		const spec = getModuleSpecifier(trimmed);
 		const group = classify(spec, localAliasPrefixes);
-		const wrapped = wrapImportIfNeeded(trimmed, 100);
+		const wrapped = wrapImportIfNeeded(trimmed);
 		return { spec, group, finalText: wrapped, multi: isMultiLineImport(wrapped) };
 	});
 
