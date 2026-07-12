@@ -1,7 +1,7 @@
 {
 	"name": "@appartmint/tsm-scripts",
 	"author": "App Art Mint LLC",
-	"version": "0.3.2",
+	"version": "0.4.0",
 	"type": "module",
 	"license": "MIT",
 	"description": "TypeScript Node Scripts from App Art Mint LLC",
@@ -37,7 +37,7 @@
 		"test:types": "tsc -b",
 		"test:deps": "depcruise src",
 		"lint": "eslint --fix .",
-		"publish:link": "yalc publish",
+		"yalc:publish": "yalc publish",
 		"check:updates": "npm-check-updates",
 		"aws:amplify:branch": "tsx src/aws/amplify/branch.ts",
 		"aws:amplify:delete": "tsx src/aws/amplify/delete.ts",
@@ -50,7 +50,7 @@
 		"ngx:build": "tsx src/ngx/build-libraries.ts"
 	},
 	"dependencies": {
-		"globby": "^14.1.0"
+		"globby": "^16.2.1"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
