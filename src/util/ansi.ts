@@ -262,3 +262,55 @@ export function sgrBackgroundRgb(rgb: Rgb): string {
 export function wrapSgr(text: string, ...codes: number[]): string {
 	return `${sgrSequence(...codes)}${text}${sgr.reset}`;
 }
+
+/** Wrap text with truecolor foreground, then reset. */
+export function wrapForegroundRgb(text: string, rgb: Rgb): string {
+	return `${sgrForegroundRgb(rgb)}${text}${sgr.reset}`;
+}
+
+/**
+ * Underline text without a full SGR reset so surrounding color can continue
+ * if the caller wraps color outside this span.
+ */
+export function wrapUnderline(text: string): string {
+	return `${sgr.underline}${text}${sgr.resetUnderline}`;
+}
+
+/** Strip CSI SGR sequences (`ESC [ … m`) for visible-width math. */
+export function stripAnsi(text: string): string {
+	return text.replace(new RegExp(`${ESC}\\[[0-9;]*m`, 'g'), '');
+}
+
+export function visibleLength(text: string): number {
+	return stripAnsi(text).length;
+}
+
+export function padVisibleEnd(text: string, width: number): string {
+	const pad = Math.max(0, width - visibleLength(text));
+	return text + ' '.repeat(pad);
+}
+
+export function padVisibleStart(text: string, width: number): string {
+	const pad = Math.max(0, width - visibleLength(text));
+	return ' '.repeat(pad) + text;
+}
+
+/**
+ * Named RGB colors tuned for dark terminals (bg ~`#1e1e1e`).
+ * Softened brand hues for readable contrast without neon glare.
+ */
+export const palette = {
+	stoplightGreen: [46, 204, 113],
+	angularRed: [221, 48, 64],
+	amplifyViolet: [140, 100, 230],
+	mintGreen: [152, 216, 184],
+	fontAwesomeBlue: [70, 150, 220],
+	typescriptBlue: [49, 120, 198],
+	javascriptYellow: [210, 180, 70],
+	sassPink: [204, 102, 153],
+	reactBlue: [80, 180, 210],
+	reactBlueDark: [45, 130, 165],
+	vueGreen: [66, 184, 131],
+	nuxtGreen: [0, 200, 130],
+	webOrange: [230, 140, 60],
+} as const satisfies Record<string, Rgb>;

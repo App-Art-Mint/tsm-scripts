@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { wrapSgr } from './ansi';
+import { padVisibleEnd, visibleLength, wrapSgr } from './ansi';
 
 /**
  * Border glyphs for terminal cards. Most presets use only `h` and `v` for runs;
@@ -110,7 +110,7 @@ export function logCard({ title, lines, style }: LogCardProps) {
 	}
 
 	const b = resolveBox(style);
-	const maxLineLength = Math.max(...normalizedLines.map(line => line.length));
+	const maxLineLength = Math.max(0, ...normalizedLines.map(line => visibleLength(line)));
 	const borderLength = maxLineLength + 4;
 	const innerWidth = borderLength - 2;
 	const { left: vl, right: vr } = verticalPair(b);
@@ -120,9 +120,11 @@ export function logCard({ title, lines, style }: LogCardProps) {
 	const sep = horizontalRun(b, innerWidth, 'titleSep');
 	const underLine = `${vl}${sep}${vr}`;
 	const titleLine = normalizedTitle
-		? `${vl} ${wrapSgr(normalizedTitle.padEnd(maxLineLength), 1)} ${vr}\n${underLine}`
+		? `${vl} ${wrapSgr(padVisibleEnd(normalizedTitle, maxLineLength), 1)} ${vr}\n${underLine}`
 		: undefined;
-	const contentLines = normalizedLines.map(line => `${vl} ${line.padEnd(maxLineLength)} ${vr}`);
+	const contentLines = normalizedLines.map(
+		line => `${vl} ${padVisibleEnd(line, maxLineLength)} ${vr}`
+	);
 	const borderBottom = horizontalRun(b, innerWidth, 'bottom');
 	const footerLine = `${b.bl}${borderBottom}${b.br}\n`;
 	console.log(headerLine);
@@ -134,7 +136,7 @@ export function logCard({ title, lines, style }: LogCardProps) {
 function logCardHeavyTitle({ title, lines }: Pick<LogCardProps, 'title' | 'lines'>) {
 	const H = BOX_STYLES.heavy;
 	const L = BOX_STYLES.light;
-	const maxLineLength = Math.max(...lines.map(line => line.length));
+	const maxLineLength = Math.max(0, ...lines.map(line => visibleLength(line)));
 	const borderLength = maxLineLength + 4;
 	const innerWidth = borderLength - 2;
 
@@ -142,9 +144,9 @@ function logCardHeavyTitle({ title, lines }: Pick<LogCardProps, 'title' | 'lines
 	const headerLine = `\n${H.tl}${borderTop}${H.tr}`;
 	const underLine = `${H.v}${H.h.repeat(innerWidth)}${H.v}`;
 	const titleLine = title
-		? `${H.v} ${wrapSgr(title.padEnd(maxLineLength), 1)} ${H.v}\n${underLine}`
+		? `${H.v} ${wrapSgr(padVisibleEnd(title, maxLineLength), 1)} ${H.v}\n${underLine}`
 		: undefined;
-	const contentLines = lines.map(line => `${L.v} ${line.padEnd(maxLineLength)} ${L.v}`);
+	const contentLines = lines.map(line => `${L.v} ${padVisibleEnd(line, maxLineLength)} ${L.v}`);
 	const borderBottom = L.h.repeat(innerWidth);
 	const footerLine = `${L.bl}${borderBottom}${L.br}\n`;
 	console.log(headerLine);
