@@ -96,14 +96,21 @@ function verticalPair(b: BoxChars): { left: string; right: string } {
 	return { left: b.v, right: b.vRight ?? b.v };
 }
 
+function expandTabs(text: string): string {
+	return text.replaceAll('\t', '    ');
+}
+
 export function logCard({ title, lines, style }: LogCardProps) {
+	const normalizedTitle = title != null ? expandTabs(title) : undefined;
+	const normalizedLines = lines.map(expandTabs);
+
 	if (style === 'heavyTitle') {
-		logCardHeavyTitle({ title, lines });
+		logCardHeavyTitle({ title: normalizedTitle, lines: normalizedLines });
 		return;
 	}
 
 	const b = resolveBox(style);
-	const maxLineLength = Math.max(...lines.map(line => line.length));
+	const maxLineLength = Math.max(...normalizedLines.map(line => line.length));
 	const borderLength = maxLineLength + 4;
 	const innerWidth = borderLength - 2;
 	const { left: vl, right: vr } = verticalPair(b);
@@ -112,14 +119,14 @@ export function logCard({ title, lines, style }: LogCardProps) {
 	const headerLine = `\n${b.tl}${borderTop}${b.tr}`;
 	const sep = horizontalRun(b, innerWidth, 'titleSep');
 	const underLine = `${vl}${sep}${vr}`;
-	const titleLine = title
-		? `${vl} ${wrapSgr(title.padEnd(maxLineLength), 1)} ${vr}\n${underLine}`
-		: '';
-	const contentLines = lines.map(line => `${vl} ${line.padEnd(maxLineLength)} ${vr}`);
+	const titleLine = normalizedTitle
+		? `${vl} ${wrapSgr(normalizedTitle.padEnd(maxLineLength), 1)} ${vr}\n${underLine}`
+		: undefined;
+	const contentLines = normalizedLines.map(line => `${vl} ${line.padEnd(maxLineLength)} ${vr}`);
 	const borderBottom = horizontalRun(b, innerWidth, 'bottom');
 	const footerLine = `${b.bl}${borderBottom}${b.br}\n`;
 	console.log(headerLine);
-	console.log(titleLine);
+	if (titleLine != null) console.log(titleLine);
 	console.log(contentLines.join('\n'));
 	console.log(footerLine);
 }
@@ -136,12 +143,12 @@ function logCardHeavyTitle({ title, lines }: Pick<LogCardProps, 'title' | 'lines
 	const underLine = `${H.v}${H.h.repeat(innerWidth)}${H.v}`;
 	const titleLine = title
 		? `${H.v} ${wrapSgr(title.padEnd(maxLineLength), 1)} ${H.v}\n${underLine}`
-		: '';
+		: undefined;
 	const contentLines = lines.map(line => `${L.v} ${line.padEnd(maxLineLength)} ${L.v}`);
 	const borderBottom = L.h.repeat(innerWidth);
 	const footerLine = `${L.bl}${borderBottom}${L.br}\n`;
 	console.log(headerLine);
-	console.log(titleLine);
+	if (titleLine != null) console.log(titleLine);
 	console.log(contentLines.join('\n'));
 	console.log(footerLine);
 }

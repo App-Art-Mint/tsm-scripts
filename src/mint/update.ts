@@ -210,7 +210,7 @@ logCard({
 		'Filter: ' + (FILTER === 'all' ? 'all' : FILTER),
 		'Dependencies Synced:  ' + syncedCount.toString(),
 		'Dependencies Changed: ' + changedCount.toString(),
-		...changed.map(c => `\t${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`),
+		...changed.map(c => `    ${c.name}: ${c.before ?? '(none)'} → ${c.after ?? '(none)'}`),
 	],
 });
 
