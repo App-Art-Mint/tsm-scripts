@@ -205,6 +205,7 @@ const syncedCount = allNames.length;
 const changedCount = changed.length;
 
 logCard({
+	title: 'Synced Mint Dependencies',
 	lines: [
 		'Root: ' + ROOT,
 		'Filter: ' + (FILTER === 'all' ? 'all' : FILTER),
