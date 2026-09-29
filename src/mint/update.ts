@@ -247,6 +247,14 @@ function readPackageJson(root: string): PackageJson {
 	return JSON.parse(fs.readFileSync(p, 'utf8')) as PackageJson;
 }
 
+function readDeclaredVersion(pkg: PackageJson, packageName: string): string | undefined {
+	return (
+		pkg.dependencies?.[packageName] ??
+		pkg.devDependencies?.[packageName] ??
+		pkg.peerDependencies?.[packageName]
+	);
+}
+
 function readLockVersion(root: string, packageName: string): string | undefined {
 	const lockPath = path.join(root, 'package-lock.json');
 	if (!fs.existsSync(lockPath)) return undefined;
@@ -256,12 +264,40 @@ function readLockVersion(root: string, packageName: string): string | undefined 
 	return lock.packages?.[`node_modules/${packageName}`]?.version;
 }
 
-function snapshotVersions(root: string, names: string[]): Map<string, string | undefined> {
-	const m = new Map<string, string | undefined>();
+/** `^1.2.3` / `~1.2.3` → `1.2.3`. A range with no semver is left as written. */
+function versionFromRange(range: string | undefined): string | undefined {
+	if (range == null) return undefined;
+	const match = /[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/.exec(range);
+	return match?.[0] ?? range;
+}
+
+interface VersionSnapshot {
+	declared: string | undefined;
+	locked: string | undefined;
+}
+
+function snapshotVersions(root: string, names: string[]): Map<string, VersionSnapshot> {
+	const pkg = readPackageJson(root);
+	const m = new Map<string, VersionSnapshot>();
 	for (const n of names) {
-		m.set(n, readLockVersion(root, n));
+		m.set(n, {
+			declared: readDeclaredVersion(pkg, n),
+			locked: readLockVersion(root, n),
+		});
 	}
 	return m;
+}
+
+/**
+ * `npm i pkg@latest` rewrites the range in package.json even when the lockfile
+ * already resolved a caret range to that version. Show the range that moved.
+ * When only the installed version moves, show that instead.
+ */
+function shownVersion(snapshot: VersionSnapshot, preferDeclared: boolean): string | undefined {
+	if (preferDeclared) {
+		return versionFromRange(snapshot.declared) ?? snapshot.locked;
+	}
+	return snapshot.locked ?? versionFromRange(snapshot.declared);
 }
 
 function runNpmInstallLatest(
@@ -354,9 +390,15 @@ const changed: { name: string; before: string | undefined; after: string | undef
 for (const name of allNames) {
 	const b = before.get(name);
 	const a = after.get(name);
-	if (b !== a) {
-		changed.push({ name, before: b, after: a });
-	}
+	if (b == null || a == null) continue;
+	const declaredChanged = b.declared !== a.declared;
+	const lockedChanged = b.locked !== a.locked;
+	if (!declaredChanged && !lockedChanged) continue;
+	changed.push({
+		name,
+		before: shownVersion(b, declaredChanged),
+		after: shownVersion(a, declaredChanged),
+	});
 }
 
 const syncedCount = allNames.length;
